@@ -4,8 +4,6 @@
 
 內容以官方 release blog 與 full changelog 為學習地圖，涵蓋其中最重要、能由 Go SDK v1.7.0 公開 API 清楚示範的主題；它不是整份 MCP specification 的本地複本，也不宣稱每一個 extension 都已有 Go typed API。
 
-完整 scope、設計決策、驗證矩陣與已完成的 done definition 請見 [`plan.md`](./plan.md)。
-
 ## 環境需求
 
 - Go 1.25 或更新版本。go-sdk v1.7.0 的 `go.mod` 要求 Go 1.25。
