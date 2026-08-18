@@ -4,10 +4,21 @@
 
 內容以官方 release blog 與 full changelog 為學習地圖，涵蓋其中最重要、能由 Go SDK v1.7.0 公開 API 清楚示範的主題；它不是整份 MCP specification 的本地複本，也不宣稱每一個 extension 都已有 Go typed API。
 
+## 快速開始
+
+```bash
+git clone https://github.com/go-training/mcp-2026-07-28.git
+cd mcp-2026-07-28
+go mod download
+go test ./...
+```
+
+所有範例都會自行啟動 in-memory transport 或 loopback HTTP server，不需要另外部署 MCP server。
+
 ## 環境需求
 
 - Go 1.25 或更新版本。go-sdk v1.7.0 的 `go.mod` 要求 Go 1.25。
-- 不需要外部 MCP server、API key、資料庫或網際網路服務；HTTP 範例只使用 `httptest` 的 loopback server。
+- 範例執行期間不需要外部 MCP server、API key、資料庫或網路服務；HTTP 範例只使用 `httptest` 的 loopback server。首次執行 `go mod download` 仍需要網路下載 Go modules。
 - 所有範例固定使用 `github.com/modelcontextprotocol/go-sdk v1.7.0`，不依賴 `main` branch 或 pre-release。
 
 確認版本：
@@ -55,12 +66,13 @@ flowchart LR
     Migration --> Verify
 ```
 
-## 一鍵驗證
+## 快速驗證
 
 ```bash
 go fmt ./...
 go vet ./...
 go test ./...
+go test -race ./...
 ```
 
 逐一執行：
@@ -85,7 +97,7 @@ go run ./09-extensions-and-tasks
 
 go-sdk 保留舊版 peer 的相容路徑。這代表 deprecated type 還能編譯，並不代表它適合新設計；同樣地，`MCPGODEBUG` 只為短期 migration 預留，v1.7.0 release 明確說明本版新增的七個 flag 將於 v1.9.0 移除。
 
-Tasks 已是官方 `io.modelcontextprotocol/tasks` extension，不是 experimental core；但 go-sdk v1.7.0 尚未提供 `Task`、`CreateTaskResult`、`TasksGet` 或 task notification 等 first-class typed API。因此第 09 章只用 SDK 真正提供的 extension capability 與 custom-method API 示範 negotiation，不用本地型別假裝完成 Tasks implementation。
+Tasks 已是官方 `io.modelcontextprotocol/tasks` extension，不是 experimental core；但 go-sdk v1.7.0 尚未提供 `Task`、`CreateTaskResult`、`TasksGet` 或 task notification 等 first-class typed API。因此第 09 章的可執行程式只宣告中性的 `com.example/extension-probe`，使用 SDK 真正提供的 extension capability 與 custom-method API 示範 negotiation；它不會宣告官方 Tasks capability，也不用本地型別假裝完成 Tasks implementation。Tasks lifecycle 則依官方 wire specification 在該章 README 中獨立解說。
 
 ## 其他 changelog 變更
 
