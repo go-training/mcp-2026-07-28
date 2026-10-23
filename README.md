@@ -17,7 +17,7 @@ go test ./...
 
 ## 環境需求
 
-- Go 1.25 或更新版本。go-sdk v1.7.0 的 `go.mod` 要求 Go 1.25。
+- Go 1.26.10 或更新版本；CI 使用 `go.mod` 指定的 Go 版本。
 - 範例執行期間不需要外部 MCP server、API key、資料庫或網路服務；HTTP 範例只使用 `httptest` 的 loopback server。首次執行 `go mod download` 仍需要網路下載 Go modules。
 - 所有範例固定使用 `github.com/modelcontextprotocol/go-sdk v1.7.0`，不依賴 `main` branch 或 pre-release。
 
@@ -69,10 +69,18 @@ flowchart LR
 ## 快速驗證
 
 ```bash
-go fmt ./...
+test -z "$(gofmt -l .)"
 go vet ./...
-go test ./...
-go test -race ./...
+go test -race -count=1 ./...
+go build ./...
+```
+
+GitHub Actions 會在 push、pull request 與手動觸發時執行上述檢查。Trivy 另外每週掃描一次依賴漏洞與 secrets，發現問題時會使工作失敗；保留所有 severity（包含 UNKNOWN），避免漏掉未評級的 Go 漏洞。
+
+本機使用 Trivy 0.69.3 執行相同掃描：
+
+```bash
+trivy fs --scanners vuln,secret --format table --exit-code 1 --timeout 5m --skip-dirs .git,.cache .
 ```
 
 逐一執行：
