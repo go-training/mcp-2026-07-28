@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -25,13 +26,15 @@ type executionReport struct {
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	report, err := executeDetailed(ctx, "accept", func(format string, args ...any) {
+	result, rounds, err := execute(ctx, "accept", func(format string, args ...any) {
+		//nolint:forbidigo // Console output demonstrates the protocol behavior in this CLI example.
 		fmt.Printf(format+"\n", args...)
 	})
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("final result: %s (tool handler rounds: %d)\n", report.Result, report.Rounds)
+	//nolint:forbidigo // Console output demonstrates the protocol behavior in this CLI example.
+	fmt.Printf("final result: %s (tool handler rounds: %d)\n", result, rounds)
 }
 
 // execute retains the small API used by the original example and delegates to
@@ -41,11 +44,17 @@ func execute(ctx context.Context, action string, printf func(string, ...any)) (s
 	return report.Result, report.Rounds, err
 }
 
-func executeDetailed(ctx context.Context, action string, printf func(string, ...any)) (executionReport, error) {
+func executeDetailed(
+	ctx context.Context,
+	action string,
+	printf func(string, ...any),
+) (executionReport, error) {
 	var report executionReport
 	server := mcp.NewServer(&mcp.Implementation{Name: "mrtr-server", Version: "1.0.0"}, nil)
 	rounds := 0
-	mcp.AddTool(server, &mcp.Tool{Name: "deploy", Description: "Deploy after confirmation"},
+	mcp.AddTool(
+		server,
+		&mcp.Tool{Name: "deploy", Description: "Deploy after confirmation"},
 		func(_ context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
 			rounds++
 			if len(req.Params.InputResponses) == 0 {
@@ -80,24 +89,29 @@ func executeDetailed(ctx context.Context, action string, printf func(string, ...
 			return &mcp.CallToolResult{Content: []mcp.Content{
 				&mcp.TextContent{Text: "deployed with ticket " + ticket},
 			}}, nil, nil
-		})
+		},
+	)
 
-	client := mcp.NewClient(&mcp.Implementation{Name: "mrtr-client", Version: "1.0.0"},
-		&mcp.ClientOptions{ElicitationHandler: func(_ context.Context, req *mcp.ElicitRequest) (*mcp.ElicitResult, error) {
-			printf("round 2: client handles elicitation: %s", req.Params.Message)
-			responseAction := action
-			var content map[string]any
-			switch action {
-			case "accept":
-				content = map[string]any{"ticket": "OPS-2575"}
-			case "malformed":
-				responseAction = "accept"
-				// A whitespace-only string passes the wire schema's type check,
-				// but the server still rejects it as invalid business input.
-				content = map[string]any{"ticket": " "}
-			}
-			return &mcp.ElicitResult{Action: responseAction, Content: content}, nil
-		}})
+	client := mcp.NewClient(
+		&mcp.Implementation{Name: "mrtr-client", Version: "1.0.0"},
+		&mcp.ClientOptions{
+			ElicitationHandler: func(_ context.Context, req *mcp.ElicitRequest) (*mcp.ElicitResult, error) {
+				printf("round 2: client handles elicitation: %s", req.Params.Message)
+				responseAction := action
+				var content map[string]any
+				switch action {
+				case "accept":
+					content = map[string]any{"ticket": "OPS-2575"}
+				case "malformed":
+					responseAction = "accept"
+					// A whitespace-only string passes the wire schema's type check,
+					// but the server still rejects it as invalid business input.
+					content = map[string]any{"ticket": " "}
+				}
+				return &mcp.ElicitResult{Action: responseAction, Content: content}, nil
+			},
+		},
+	)
 
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	serverSession, err := server.Connect(ctx, serverTransport, nil)
@@ -129,7 +143,8 @@ func executeDetailed(ctx context.Context, action string, printf func(string, ...
 	if err != nil {
 		return report, err
 	}
-	distinctIDs := len(report.ToolCallRequestIDs) == 2 && report.ToolCallRequestIDs[0] != report.ToolCallRequestIDs[1]
+	distinctIDs := len(report.ToolCallRequestIDs) == 2 &&
+		report.ToolCallRequestIDs[0] != report.ToolCallRequestIDs[1]
 	printf("requestState echoed unchanged: %t", report.RequestStateEchoed)
 	printf(
 		"wire MRTR: tools/call requests=%d distinct IDs=%t resultTypes=%s",
@@ -142,14 +157,14 @@ func executeDetailed(ctx context.Context, action string, printf func(string, ...
 
 func validateApproval(params *mcp.CallToolParamsRaw) (action, ticket string, err error) {
 	if params == nil {
-		return "", "", fmt.Errorf("missing tool params")
+		return "", "", errors.New("missing tool params")
 	}
 	if params.RequestState != deployRequestState {
-		return "", "", fmt.Errorf("requestState mismatch")
+		return "", "", errors.New("requestState mismatch")
 	}
 	raw, ok := params.InputResponses["approval"]
 	if !ok || raw == nil {
-		return "", "", fmt.Errorf("missing approval response")
+		return "", "", errors.New("missing approval response")
 	}
 	response, ok := raw.(*mcp.ElicitResult)
 	if !ok || response == nil {
@@ -161,11 +176,11 @@ func validateApproval(params *mcp.CallToolParamsRaw) (action, ticket string, err
 	case "accept":
 		value, ok := response.Content["ticket"]
 		if !ok {
-			return "", "", fmt.Errorf("missing ticket")
+			return "", "", errors.New("missing ticket")
 		}
 		ticket, ok := value.(string)
 		if !ok || strings.TrimSpace(ticket) == "" {
-			return "", "", fmt.Errorf("ticket must be a non-empty string")
+			return "", "", errors.New("ticket must be a non-empty string")
 		}
 		return response.Action, ticket, nil
 	default:
@@ -182,7 +197,7 @@ func toolError(message string) *mcp.CallToolResult {
 
 func firstText(result *mcp.CallToolResult) (string, error) {
 	if result == nil || len(result.Content) == 0 {
-		return "", fmt.Errorf("tool result has no content")
+		return "", errors.New("tool result has no content")
 	}
 	text, ok := result.Content[0].(*mcp.TextContent)
 	if !ok || text == nil {

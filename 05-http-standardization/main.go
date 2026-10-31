@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -107,6 +108,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := run(ctx, func(format string, args ...any) {
+		//nolint:forbidigo // Console output demonstrates the protocol behavior in this CLI example.
 		fmt.Printf(format+"\n", args...)
 	}); err != nil {
 		panic(err)
@@ -189,11 +191,11 @@ func run(ctx context.Context, printf func(string, ...any)) error {
 	recorder.mutateOneCall(mutationMethodMismatch)
 	_, mismatchErr := session.CallTool(ctx, params)
 	if mismatchErr == nil {
-		return fmt.Errorf("corrupted header unexpectedly succeeded")
+		return errors.New("corrupted header unexpectedly succeeded")
 	}
 	mismatch, ok := recorder.errorObservation(mutationMethodMismatch)
 	if !ok {
-		return fmt.Errorf("missing observation for mismatched header")
+		return errors.New("missing observation for mismatched header")
 	}
 	printf("mismatched header status: %d", mismatch.Status)
 	printf("mismatched header protocol code: %d", mismatch.Code)
@@ -208,16 +210,23 @@ func run(ctx context.Context, printf func(string, ...any)) error {
 	recorder.mutateOneCall(mutationMissingMethod)
 	_, missingErr := missingSession.CallTool(ctx, params)
 	if missingErr == nil {
-		return fmt.Errorf("missing Mcp-Method header unexpectedly succeeded")
+		return errors.New("missing Mcp-Method header unexpectedly succeeded")
 	}
 	missing, ok := recorder.errorObservation(mutationMissingMethod)
 	if !ok {
-		return fmt.Errorf("missing observation for absent Mcp-Method header (client error: %v)", missingErr)
+		return fmt.Errorf(
+			"missing observation for absent Mcp-Method header (client error: %v)",
+			missingErr,
+		)
 	}
 	printf("missing Mcp-Method status: %d", missing.Status)
 	printf("missing Mcp-Method protocol code: %d", missing.Code)
 	printf("rejected requests reached tool handler: %t", toolCalls.Load() != validToolCalls)
-	printf("MCP reserved errors: HeaderMismatch=%d MissingRequiredClientCapability=%d UnsupportedProtocolVersion=%d",
-		mcp.CodeHeaderMismatch, mcp.CodeMissingRequiredClientCapabilities, mcp.CodeUnsupportedProtocolVersion)
+	printf(
+		"MCP reserved errors: HeaderMismatch=%d MissingRequiredClientCapability=%d UnsupportedProtocolVersion=%d",
+		mcp.CodeHeaderMismatch,
+		mcp.CodeMissingRequiredClientCapabilities,
+		mcp.CodeUnsupportedProtocolVersion,
+	)
 	return nil
 }
