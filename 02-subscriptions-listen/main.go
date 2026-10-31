@@ -35,6 +35,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := run(ctx, func(format string, args ...any) {
+		//nolint:forbidigo // Console output demonstrates the protocol behavior in this CLI example.
 		fmt.Printf(format+"\n", args...)
 	}); err != nil {
 		panic(err)
@@ -46,7 +47,10 @@ func run(ctx context.Context, printf func(string, ...any)) error {
 	return err
 }
 
-func runSubscriptionScenario(ctx context.Context, printf func(string, ...any)) (subscriptionReport, error) {
+func runSubscriptionScenario(
+	ctx context.Context,
+	printf func(string, ...any),
+) (subscriptionReport, error) {
 	var report subscriptionReport
 	subscribed := make(chan string, 2)
 	unsubscribed := make(chan string, 2)
@@ -68,7 +72,11 @@ func runSubscriptionScenario(ctx context.Context, printf func(string, ...any)) (
 		},
 	)
 	server.AddResource(
-		&mcp.Resource{Name: "taipei-weather", URI: weatherResourceURI, Description: "Current Taipei weather"},
+		&mcp.Resource{
+			Name:        "taipei-weather",
+			URI:         weatherResourceURI,
+			Description: "Current Taipei weather",
+		},
 		func(context.Context, *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
 			return &mcp.ReadResourceResult{Contents: []*mcp.ResourceContents{{
 				URI: weatherResourceURI, Text: "sunny",
@@ -102,7 +110,8 @@ func runSubscriptionScenario(ctx context.Context, printf func(string, ...any)) (
 	)
 	client.AddReceivingMiddleware(func(next mcp.MethodHandler) mcp.MethodHandler {
 		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
-			if ack, ok := req.(*mcp.ClientRequest[*mcp.SubscriptionsAcknowledgedParams]); ok && ack.Params != nil {
+			if ack, ok := req.(*mcp.ClientRequest[*mcp.SubscriptionsAcknowledgedParams]); ok &&
+				ack.Params != nil {
 				n := ack.Params.Notifications
 				acknowledgements <- acknowledgementObservation{
 					Tools:          n.ToolsListChanged,
@@ -116,14 +125,22 @@ func runSubscriptionScenario(ctx context.Context, printf func(string, ...any)) (
 		}
 	})
 
-	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: httpServer.URL}, nil)
+	session, err := client.Connect(
+		ctx,
+		&mcp.StreamableClientTransport{Endpoint: httpServer.URL},
+		nil,
+	)
 	if err != nil {
 		return report, fmt.Errorf("connect and open subscriptions/listen: %w", err)
 	}
 	defer session.Close()
 	printf("connected with protocol: %s", session.InitializeResult().ProtocolVersion)
 
-	report.ToolAcknowledgement, err = waitFor(ctx, acknowledgements, "tool/prompt subscription acknowledgement")
+	report.ToolAcknowledgement, err = waitFor(
+		ctx,
+		acknowledgements,
+		"tool/prompt subscription acknowledgement",
+	)
 	if err != nil {
 		return report, err
 	}
@@ -162,7 +179,11 @@ func runSubscriptionScenario(ctx context.Context, printf func(string, ...any)) (
 	if err := session.Subscribe(ctx, &mcp.SubscribeParams{URI: weatherResourceURI}); err != nil {
 		return report, fmt.Errorf("subscribe to %s: %w", weatherResourceURI, err)
 	}
-	report.ResourceAcknowledgement, err = waitFor(ctx, acknowledgements, "resource subscription acknowledgement")
+	report.ResourceAcknowledgement, err = waitFor(
+		ctx,
+		acknowledgements,
+		"resource subscription acknowledgement",
+	)
 	if err != nil {
 		return report, err
 	}
@@ -180,7 +201,10 @@ func runSubscriptionScenario(ctx context.Context, printf func(string, ...any)) (
 		report.ResourceAcknowledgement.SubscriptionID != "",
 	)
 
-	if err := server.ResourceUpdated(ctx, &mcp.ResourceUpdatedNotificationParams{URI: weatherResourceURI}); err != nil {
+	if err := server.ResourceUpdated(
+		ctx,
+		&mcp.ResourceUpdatedNotificationParams{URI: weatherResourceURI},
+	); err != nil {
 		return report, fmt.Errorf("publish resource update: %w", err)
 	}
 	resourceEvent, err := waitFor(ctx, resourceEvents, "resources/updated")
@@ -196,7 +220,10 @@ func runSubscriptionScenario(ctx context.Context, printf func(string, ...any)) (
 		report.ResourceEventID == report.ResourceAcknowledgement.SubscriptionID,
 	)
 
-	if err := session.Unsubscribe(ctx, &mcp.UnsubscribeParams{URI: weatherResourceURI}); err != nil {
+	if err := session.Unsubscribe(
+		ctx,
+		&mcp.UnsubscribeParams{URI: weatherResourceURI},
+	); err != nil {
 		return report, fmt.Errorf("unsubscribe from %s: %w", weatherResourceURI, err)
 	}
 	report.UnsubscribeHandlerURI, err = waitFor(ctx, unsubscribed, "server UnsubscribeHandler")

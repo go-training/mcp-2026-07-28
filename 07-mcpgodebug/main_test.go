@@ -20,7 +20,8 @@ func TestMCPGODEBUGHelper(t *testing.T) {
 		panic(err)
 	}
 	os.Stdout.WriteString(observation)
-	os.Exit(0)
+	cancel()
+	os.Exit(0) //nolint:gocritic // Explicit cancellation above precedes the helper-process exit.
 }
 
 func runHelper(t *testing.T, scenario, debug string) string {
@@ -42,12 +43,22 @@ func TestV170CompatibilityFlags(t *testing.T) {
 		wantCompat  string
 	}{
 		{"customresnotfounderrcode", "resource-not-found", "code=-32602", "code=-32002"},
-		{"hintomitempty", "tool-hints", `json={"idempotentHint":false,"readOnlyHint":false}`, "json={}"},
+		{
+			"hintomitempty",
+			"tool-hints",
+			`json={"idempotentHint":false,"readOnlyHint":false}`,
+			"json={}",
+		},
 		{"allowsessionsinstateless", "stateless-session", "DELETE status=405", "DELETE status=204"},
 		{"nomethodnotfoundcodeinerror", "method-not-found", "code=-32601", "code=0"},
 		{"noprotocolerrorbody", "protocol-error-body", "surfaced code=-32022", "surfaced code=0"},
 		{"nowrapinvalidparams", "invalid-params", "code=-32602", "code=0"},
-		{"disablecompleteparamsvalidation", "complete-validation", "handler-called=false code=-32602", "handler-called=true code=0"},
+		{
+			"disablecompleteparamsvalidation",
+			"complete-validation",
+			"handler-called=false code=-32602",
+			"handler-called=true code=0",
+		},
 	}
 
 	for _, test := range tests {

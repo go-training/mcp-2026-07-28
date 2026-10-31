@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,37 +25,39 @@ type authorizationFixture struct {
 
 func newAuthorizationFixture() *authorizationFixture {
 	fixture := &authorizationFixture{}
-	fixture.server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		switch r.URL.Path {
-		case "/.well-known/oauth-protected-resource/mcp":
-			_ = json.NewEncoder(w).Encode(&oauthex.ProtectedResourceMetadata{
-				Resource:             fixture.server.URL + "/mcp",
-				AuthorizationServers: []string{fixture.server.URL},
-				ScopesSupported:      []string{"mcp:read"},
-			})
-		case "/.well-known/oauth-authorization-server":
-			_ = json.NewEncoder(w).Encode(&oauthex.AuthServerMeta{
-				Issuer:                                     fixture.server.URL,
-				AuthorizationEndpoint:                      fixture.server.URL + "/authorize",
-				TokenEndpoint:                              fixture.server.URL + "/token",
-				ResponseTypesSupported:                     []string{"code"},
-				GrantTypesSupported:                        []string{"authorization_code"},
-				TokenEndpointAuthMethodsSupported:          []string{"none"},
-				CodeChallengeMethodsSupported:              []string{"S256"},
-				AuthorizationResponseIssParameterSupported: true,
-			})
-		case "/token":
-			fixture.tokenExchanges.Add(1)
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"access_token": "fixture-access-token",
-				"token_type":   "Bearer",
-				"expires_in":   3600,
-			})
-		default:
-			http.NotFound(w, r)
-		}
-	}))
+	fixture.server = httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			switch r.URL.Path {
+			case "/.well-known/oauth-protected-resource/mcp":
+				_ = json.NewEncoder(w).Encode(&oauthex.ProtectedResourceMetadata{
+					Resource:             fixture.server.URL + "/mcp",
+					AuthorizationServers: []string{fixture.server.URL},
+					ScopesSupported:      []string{"mcp:read"},
+				})
+			case "/.well-known/oauth-authorization-server":
+				_ = json.NewEncoder(w).Encode(&oauthex.AuthServerMeta{
+					Issuer:                                     fixture.server.URL,
+					AuthorizationEndpoint:                      fixture.server.URL + "/authorize",
+					TokenEndpoint:                              fixture.server.URL + "/token",
+					ResponseTypesSupported:                     []string{"code"},
+					GrantTypesSupported:                        []string{"authorization_code"},
+					TokenEndpointAuthMethodsSupported:          []string{"none"},
+					CodeChallengeMethodsSupported:              []string{"S256"},
+					AuthorizationResponseIssParameterSupported: true,
+				})
+			case "/token":
+				fixture.tokenExchanges.Add(1)
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"access_token": "fixture-access-token",
+					"token_type":   "Bearer",
+					"expires_in":   3600,
+				})
+			default:
+				http.NotFound(w, r)
+			}
+		}),
+	)
 	return fixture
 }
 
@@ -70,7 +73,11 @@ func (f *authorizationFixture) tokenExchangeCount() int {
 	return int(f.tokenExchanges.Load())
 }
 
-func authorize(ctx context.Context, fixture *authorizationFixture, callbackIssuer, credentialIssuer string) error {
+func authorize(
+	ctx context.Context,
+	fixture *authorizationFixture,
+	callbackIssuer, credentialIssuer string,
+) error {
 	handler, err := auth.NewAuthorizationCodeHandler(&auth.AuthorizationCodeHandlerConfig{
 		RedirectURL: "http://127.0.0.1/callback",
 		PreregisteredClient: &oauthex.ClientCredentials{
@@ -165,14 +172,18 @@ func validateCIMDConfiguration(clientIDURL string) error {
 	return err
 }
 
-func unusedAuthorizationCodeFetcher(context.Context, *auth.AuthorizationArgs) (*auth.AuthorizationResult, error) {
-	return nil, fmt.Errorf("authorization code fetcher is not used by configuration validation")
+func unusedAuthorizationCodeFetcher(
+	context.Context,
+	*auth.AuthorizationArgs,
+) (*auth.AuthorizationResult, error) {
+	return nil, errors.New("authorization code fetcher is not used by configuration validation")
 }
 
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := run(ctx, func(format string, args ...any) {
+		//nolint:forbidigo // Console output demonstrates the protocol behavior in this CLI example.
 		fmt.Printf(format+"\n", args...)
 	}); err != nil {
 		panic(err)
@@ -206,7 +217,9 @@ func run(ctx context.Context, printf func(string, ...any)) error {
 	}
 	printf("DCR fallback application_type: %s", applicationType)
 
-	cimdValid := validateCIMDConfiguration("https://client.example/oauth/client-metadata.json") == nil
+	cimdValid := validateCIMDConfiguration(
+		"https://client.example/oauth/client-metadata.json",
+	) == nil
 	printf("CIMD non-root HTTPS configuration valid: %t", cimdValid)
 	return nil
 }

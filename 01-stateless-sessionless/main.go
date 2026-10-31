@@ -49,6 +49,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := run(ctx, func(format string, args ...any) {
+		//nolint:forbidigo // Console output demonstrates the protocol behavior in this CLI example.
 		fmt.Printf(format+"\n", args...)
 	}); err != nil {
 		panic(err)
@@ -67,7 +68,9 @@ func runScenario(ctx context.Context, printf func(string, ...any)) (statelessRep
 	server := mcp.NewServer(&mcp.Implementation{
 		Name: "stateless-server", Version: "1.0.0",
 	}, nil)
-	mcp.AddTool(server, &mcp.Tool{Name: "echo", Description: "Echo a message"},
+	mcp.AddTool(
+		server,
+		&mcp.Tool{Name: "echo", Description: "Echo a message"},
 		func(_ context.Context, req *mcp.CallToolRequest, args echoArgs) (*mcp.CallToolResult, any, error) {
 			clientName := ""
 			if info := req.ClientInfo(); info != nil {
@@ -81,7 +84,8 @@ func runScenario(ctx context.Context, printf func(string, ...any)) (statelessRep
 			return &mcp.CallToolResult{Content: []mcp.Content{
 				&mcp.TextContent{Text: args.Message},
 			}}, nil, nil
-		})
+		},
+	)
 
 	var (
 		observationsMu sync.Mutex
@@ -107,7 +111,11 @@ func runScenario(ctx context.Context, printf func(string, ...any)) (statelessRep
 	client := mcp.NewClient(&mcp.Implementation{
 		Name: "stateless-client", Version: "1.0.0",
 	}, nil)
-	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: httpServer.URL}, nil)
+	session, err := client.Connect(
+		ctx,
+		&mcp.StreamableClientTransport{Endpoint: httpServer.URL},
+		nil,
+	)
 	if err != nil {
 		return report, fmt.Errorf("connect: %w", err)
 	}
@@ -174,14 +182,22 @@ func runScenario(ctx context.Context, printf func(string, ...any)) (statelessRep
 		}
 		hasSessionID = hasSessionID || obs.HasSessionID
 		if obs.MCPMethod != "" {
-			printf("wire request: method=%s protocol=%s session-header=%t", obs.MCPMethod, obs.Protocol, obs.HasSessionID)
+			printf(
+				"wire request: method=%s protocol=%s session-header=%t",
+				obs.MCPMethod,
+				obs.Protocol,
+				obs.HasSessionID,
+			)
 		}
 	}
 	printf("independent POST requests: %d; any session header: %t", requestCount, hasSessionID)
 	return report, nil
 }
 
-func requestUnsupportedProtocol(ctx context.Context, endpoint string) (unsupportedProtocolObservation, error) {
+func requestUnsupportedProtocol(
+	ctx context.Context,
+	endpoint string,
+) (unsupportedProtocolObservation, error) {
 	const requestedVersion = "2099-01-01"
 	body, err := json.Marshal(map[string]any{
 		"jsonrpc": "2.0",
@@ -200,7 +216,10 @@ func requestUnsupportedProtocol(ctx context.Context, endpoint string) (unsupport
 		},
 	})
 	if err != nil {
-		return unsupportedProtocolObservation{}, fmt.Errorf("marshal unsupported-version request: %w", err)
+		return unsupportedProtocolObservation{}, fmt.Errorf(
+			"marshal unsupported-version request: %w",
+			err,
+		)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
@@ -214,12 +233,18 @@ func requestUnsupportedProtocol(ctx context.Context, endpoint string) (unsupport
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return unsupportedProtocolObservation{}, fmt.Errorf("send unsupported-version request: %w", err)
+		return unsupportedProtocolObservation{}, fmt.Errorf(
+			"send unsupported-version request: %w",
+			err,
+		)
 	}
 	defer resp.Body.Close()
 	wireBody, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		return unsupportedProtocolObservation{}, fmt.Errorf("read unsupported-version response: %w", err)
+		return unsupportedProtocolObservation{}, fmt.Errorf(
+			"read unsupported-version response: %w",
+			err,
+		)
 	}
 	var wire struct {
 		Error *struct {
@@ -231,10 +256,17 @@ func requestUnsupportedProtocol(ctx context.Context, endpoint string) (unsupport
 		} `json:"error"`
 	}
 	if err := json.Unmarshal(wireBody, &wire); err != nil {
-		return unsupportedProtocolObservation{}, fmt.Errorf("decode unsupported-version response %q: %w", wireBody, err)
+		return unsupportedProtocolObservation{}, fmt.Errorf(
+			"decode unsupported-version response %q: %w",
+			wireBody,
+			err,
+		)
 	}
 	if wire.Error == nil {
-		return unsupportedProtocolObservation{}, fmt.Errorf("unsupported-version response has no JSON-RPC error: %s", wireBody)
+		return unsupportedProtocolObservation{}, fmt.Errorf(
+			"unsupported-version response has no JSON-RPC error: %s",
+			wireBody,
+		)
 	}
 	return unsupportedProtocolObservation{
 		Status:    resp.StatusCode,

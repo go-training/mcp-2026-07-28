@@ -86,7 +86,11 @@ func newExtensionServer() (*mcp.Server, error) {
 	return server, nil
 }
 
-func callExtensionProbe(ctx context.Context, server *mcp.Server, advertiseExtension bool) (*probeOutcome, error) {
+func callExtensionProbe(
+	ctx context.Context,
+	server *mcp.Server,
+	advertiseExtension bool,
+) (*probeOutcome, error) {
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	serverSession, err := server.Connect(ctx, serverTransport, nil)
 	if err != nil {
@@ -102,7 +106,10 @@ func callExtensionProbe(ctx context.Context, server *mcp.Server, advertiseExtens
 		&mcp.Implementation{Name: "extension-client", Version: "1.0.0"},
 		&mcp.ClientOptions{Capabilities: clientCapabilities},
 	)
-	if err := mcp.AddSendingCustomMethod[*extensionProbeParams, *extensionProbeResult](client, probeMethod); err != nil {
+	if err := mcp.AddSendingCustomMethod[*extensionProbeParams, *extensionProbeResult](
+		client,
+		probeMethod,
+	); err != nil {
 		return nil, fmt.Errorf("register probe method: %w", err)
 	}
 	clientSession, err := client.Connect(ctx, clientTransport, nil)
@@ -143,6 +150,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := run(ctx, func(format string, args ...any) {
+		//nolint:forbidigo // Console output demonstrates the protocol behavior in this CLI example.
 		fmt.Printf(format+"\n", args...)
 	}); err != nil {
 		panic(err)

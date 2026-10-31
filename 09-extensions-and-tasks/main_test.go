@@ -107,7 +107,10 @@ func TestServerReturnsMethodNotFoundForOfficialTaskMethods(t *testing.T) {
 
 	client := mcp.NewClient(&mcp.Implementation{Name: "boundary-client", Version: "1.0.0"}, nil)
 	for _, method := range []string{"tasks/get", "tasks/update", "tasks/cancel"} {
-		if err := mcp.AddSendingCustomMethod[*extensionProbeParams, *extensionProbeResult](client, method); err != nil {
+		if err := mcp.AddSendingCustomMethod[*extensionProbeParams, *extensionProbeResult](
+			client,
+			method,
+		); err != nil {
 			t.Fatalf("register client method %q: %v", method, err)
 		}
 	}
@@ -123,7 +126,12 @@ func TestServerReturnsMethodNotFoundForOfficialTaskMethods(t *testing.T) {
 		)
 		var wireError *jsonrpc.Error
 		if !errors.As(err, &wireError) || wireError.Code != jsonrpc.CodeMethodNotFound {
-			t.Errorf("%s error = %v, want MethodNotFound (%d)", method, err, jsonrpc.CodeMethodNotFound)
+			t.Errorf(
+				"%s error = %v, want MethodNotFound (%d)",
+				method,
+				err,
+				jsonrpc.CodeMethodNotFound,
+			)
 		}
 	}
 }

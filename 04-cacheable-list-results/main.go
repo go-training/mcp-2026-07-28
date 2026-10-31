@@ -16,6 +16,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := run(ctx, func(format string, args ...any) {
+		//nolint:forbidigo // Console output demonstrates the protocol behavior in this CLI example.
 		fmt.Printf(format+"\n", args...)
 	}); err != nil {
 		panic(err)
@@ -28,10 +29,13 @@ func run(ctx context.Context, printf func(string, ...any)) error {
 	// registry returns list results in ascending unique-ID order, independently
 	// of map iteration and registration order.
 	for _, name := range []string{"zeta-tool", "alpha-tool", "stable-tool"} {
-		mcp.AddTool(server, &mcp.Tool{Name: name},
+		mcp.AddTool(
+			server,
+			&mcp.Tool{Name: name},
 			func(context.Context, *mcp.CallToolRequest, struct{}) (*mcp.CallToolResult, any, error) {
 				return &mcp.CallToolResult{}, nil, nil
-			})
+			},
+		)
 	}
 
 	var serverCalls atomic.Int32
@@ -73,7 +77,11 @@ func run(ctx context.Context, printf func(string, ...any)) error {
 	if err != nil {
 		return err
 	}
-	printf("inside TTL: server calls=%d (cache hit; order=%s)", serverCalls.Load(), toolNames(insideTTL.Tools))
+	printf(
+		"inside TTL: server calls=%d (cache hit; order=%s)",
+		serverCalls.Load(),
+		toolNames(insideTTL.Tools),
+	)
 
 	time.Sleep(cacheTTL + 30*time.Millisecond)
 	afterTTL, err := clientSession.ListTools(ctx, &mcp.ListToolsParams{})
@@ -83,7 +91,11 @@ func run(ctx context.Context, printf func(string, ...any)) error {
 	afterOrder := toolNames(afterTTL.Tools)
 	printf("after TTL: server calls=%d (re-fetched; order=%s)", serverCalls.Load(), afterOrder)
 	if firstOrder != afterOrder {
-		return fmt.Errorf("tools/list order changed across re-fetch: first=%q after=%q", firstOrder, afterOrder)
+		return fmt.Errorf(
+			"tools/list order changed across re-fetch: first=%q after=%q",
+			firstOrder,
+			afterOrder,
+		)
 	}
 	return nil
 }

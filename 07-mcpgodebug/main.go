@@ -53,6 +53,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+		//nolint:forbidigo // Console output demonstrates the protocol behavior in this CLI example.
 		fmt.Println(observation)
 		return
 	}
@@ -73,11 +74,22 @@ func compareAll(ctx context.Context, out io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("%s default: %w", scenario.flag, err)
 		}
-		compatObservation, err := runScenarioProcess(ctx, executable, scenario.name, scenario.flag+"=1")
+		compatObservation, err := runScenarioProcess(
+			ctx,
+			executable,
+			scenario.name,
+			scenario.flag+"=1",
+		)
 		if err != nil {
 			return fmt.Errorf("%s compatibility: %w", scenario.flag, err)
 		}
-		fmt.Fprintf(out, "%s\n  default: %s\n  =1:      %s\n", scenario.flag, defaultObservation, compatObservation)
+		fmt.Fprintf(
+			out,
+			"%s\n  default: %s\n  =1:      %s\n",
+			scenario.flag,
+			defaultObservation,
+			compatObservation,
+		)
 	}
 	return nil
 }
@@ -106,6 +118,7 @@ func scenarioEnvironment(debug, scenario string) []string {
 func inspectScenario(ctx context.Context, scenario string) (string, error) {
 	switch scenario {
 	case "resource-not-found":
+		//nolint:staticcheck // This scenario intentionally demonstrates the deprecated code compatibility flag.
 		return fmt.Sprintf("code=%d", mcp.CodeResourceNotFound), nil
 	case "tool-hints":
 		data, err := json.Marshal(mcp.ToolAnnotations{})
@@ -162,7 +175,10 @@ func methodNotFoundCode(ctx context.Context) (int64, error) {
 	defer serverSession.Close()
 
 	client := mcp.NewClient(&mcp.Implementation{Name: "debug-client", Version: "1.0.0"}, nil)
-	if err := mcp.AddSendingCustomMethod[*customParams, *customResult](client, "example/missing"); err != nil {
+	if err := mcp.AddSendingCustomMethod[*customParams, *customResult](
+		client,
+		"example/missing",
+	); err != nil {
 		return 0, err
 	}
 	clientSession, err := client.Connect(ctx, clientTransport, nil)
@@ -171,7 +187,12 @@ func methodNotFoundCode(ctx context.Context) (int64, error) {
 	}
 	defer clientSession.Close()
 
-	_, callErr := mcp.CallCustomMethod[*customParams, *customResult](ctx, clientSession, "example/missing", &customParams{})
+	_, callErr := mcp.CallCustomMethod[*customParams, *customResult](
+		ctx,
+		clientSession,
+		"example/missing",
+		&customParams{},
+	)
 	if callErr == nil {
 		return 0, errors.New("unhandled custom method unexpectedly succeeded")
 	}
@@ -182,7 +203,10 @@ func protocolErrorBodyCode(ctx context.Context) (int64, error) {
 	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, `{"jsonrpc":"2.0","id":1,"error":{"code":-32022,"message":"unsupported protocol version"}}`)
+		fmt.Fprint(
+			w,
+			`{"jsonrpc":"2.0","id":1,"error":{"code":-32022,"message":"unsupported protocol version"}}`,
+		)
 	}))
 	defer httpServer.Close()
 
@@ -210,7 +234,12 @@ func invalidParamsCode(ctx context.Context) (int64, error) {
 	defer httpServer.Close()
 
 	body := `{"jsonrpc":"2.0","id":1,"method":"example/validate","params":{"count":"not-an-integer","_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"raw-client","version":"1.0.0"}}}}`
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, httpServer.URL, strings.NewReader(body))
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		httpServer.URL,
+		strings.NewReader(body),
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -241,11 +270,17 @@ func invalidParamsCode(ctx context.Context) (int64, error) {
 
 func completeValidation(ctx context.Context) (bool, int64, error) {
 	handlerCalled := false
-	server := mcp.NewServer(&mcp.Implementation{Name: "debug-server", Version: "1.0.0"},
-		&mcp.ServerOptions{CompletionHandler: func(context.Context, *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
-			handlerCalled = true
-			return &mcp.CompleteResult{Completion: mcp.CompletionResultDetails{Values: []string{"ok"}}}, nil
-		}})
+	server := mcp.NewServer(
+		&mcp.Implementation{Name: "debug-server", Version: "1.0.0"},
+		&mcp.ServerOptions{
+			CompletionHandler: func(context.Context, *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
+				handlerCalled = true
+				return &mcp.CompleteResult{
+					Completion: mcp.CompletionResultDetails{Values: []string{"ok"}},
+				}, nil
+			},
+		},
+	)
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	serverSession, err := server.Connect(ctx, serverTransport, nil)
 	if err != nil {
@@ -266,8 +301,7 @@ func jsonRPCErrorCode(err error) int64 {
 	if err == nil {
 		return 0
 	}
-	var wireError *jsonrpc.Error
-	if errors.As(err, &wireError) {
+	if wireError, ok := errors.AsType[*jsonrpc.Error](err); ok {
 		return wireError.Code
 	}
 	return 0

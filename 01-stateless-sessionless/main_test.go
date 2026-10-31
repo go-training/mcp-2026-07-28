@@ -35,7 +35,9 @@ func TestRunShowsSessionlessHTTP(t *testing.T) {
 			t.Errorf("output missing %q:\n%s", want, got)
 		}
 	}
-	if report.Metadata.Protocol != "2026-07-28" || report.Metadata.ClientName != "stateless-client" || !report.Metadata.CapabilitiesPresent {
+	if report.Metadata.Protocol != "2026-07-28" ||
+		report.Metadata.ClientName != "stateless-client" ||
+		!report.Metadata.CapabilitiesPresent {
 		t.Errorf("unexpected per-request metadata: %+v", report.Metadata)
 	}
 	if !report.ServerInfoPresent {

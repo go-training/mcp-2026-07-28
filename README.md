@@ -1,6 +1,6 @@
 # MCP Go SDK v1.7.0：2026-07-28 協定範例
 
-[![Go tests](https://github.com/go-training/mcp-2026-07-28/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/go-training/mcp-2026-07-28/actions/workflows/ci.yml)
+[![Lint and Testing](https://github.com/go-training/mcp-2026-07-28/actions/workflows/testing.yml/badge.svg?branch=main)](https://github.com/go-training/mcp-2026-07-28/actions/workflows/testing.yml)
 [![Trivy Security Scan](https://github.com/go-training/mcp-2026-07-28/actions/workflows/trivy.yml/badge.svg?branch=main)](https://github.com/go-training/mcp-2026-07-28/actions/workflows/trivy.yml)
 
 這個專案用可執行的 Go 程式說明 `github.com/modelcontextprotocol/go-sdk v1.7.0` 對 MCP protocol `2026-07-28` 的重要支援。重點不是只展示 SDK 函式，而是讓你實際看到 session header 消失、長連線 subscription、MRTR 重送、TTL cache、HTTP routing headers、authorization hardening、extension negotiation、deprecated feature 的替代方案，以及 `MCPGODEBUG` 的新舊行為。

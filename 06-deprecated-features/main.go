@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -14,9 +15,9 @@ import (
 )
 
 type workflowArgs struct {
-	WorkspaceURI string `json:"workspaceURI" jsonschema:"explicit workspace URI; replaces implicit roots"`
+	WorkspaceURI string `json:"workspaceURI"          jsonschema:"explicit workspace URI; replaces implicit roots"`
 	StateHandle  string `json:"stateHandle,omitempty" jsonschema:"server-minted handle returned by the previous call"`
-	Instruction  string `json:"instruction" jsonschema:"work requested by the client or model"`
+	Instruction  string `json:"instruction"           jsonschema:"work requested by the client or model"`
 }
 
 type workflowState struct {
@@ -29,6 +30,7 @@ func main() {
 	// Keep application logs off stdout so this pattern remains safe if the
 	// example is moved to the STDIO transport, where stdout carries MCP frames.
 	if err := run(ctx, os.Stderr, func(format string, args ...any) {
+		//nolint:forbidigo // Console output demonstrates the protocol behavior in this CLI example.
 		fmt.Printf(format+"\n", args...)
 	}); err != nil {
 		panic(err)
@@ -48,7 +50,9 @@ func run(ctx context.Context, logOutput io.Writer, printf func(string, ...any)) 
 	}))
 
 	server := mcp.NewServer(&mcp.Implementation{Name: "modern-server", Version: "1.0.0"}, nil)
-	mcp.AddTool(server, &mcp.Tool{Name: "workflow_step", Description: "Explicit, sessionless workflow"},
+	mcp.AddTool(
+		server,
+		&mcp.Tool{Name: "workflow_step", Description: "Explicit, sessionless workflow"},
 		func(_ context.Context, _ *mcp.CallToolRequest, args workflowArgs) (*mcp.CallToolResult, any, error) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -64,9 +68,17 @@ func run(ctx context.Context, logOutput io.Writer, printf func(string, ...any)) 
 			state.Step++
 			logger.Info("workflow step", "handle", handle, "step", state.Step,
 				"workspace", args.WorkspaceURI, "instruction", args.Instruction)
-			text := fmt.Sprintf("handle=%s step=%d workspace=%s", handle, state.Step, args.WorkspaceURI)
-			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}, nil, nil
-		})
+			text := fmt.Sprintf(
+				"handle=%s step=%d workspace=%s",
+				handle,
+				state.Step,
+				args.WorkspaceURI,
+			)
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{&mcp.TextContent{Text: text}},
+			}, nil, nil
+		},
+	)
 
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	serverSession, err := server.Connect(ctx, serverTransport, nil)
@@ -109,10 +121,12 @@ func run(ctx context.Context, logOutput io.Writer, printf func(string, ...any)) 
 	printf("roots replacement: workspaceURI is an explicit tool argument")
 	printf("sampling replacement: the client/application owns model calls")
 	printf("logging replacement: use slog/stderr or OpenTelemetry outside MCP")
-	printf("feature lifecycle: Active -> Deprecated -> Removed (minimum 12-month deprecation window)")
+	printf(
+		"feature lifecycle: Active -> Deprecated -> Removed (minimum 12-month deprecation window)",
+	)
 	printf("transport migration: legacy HTTP+SSE -> stateless Streamable HTTP")
 	if !strings.Contains(second, "step=2") {
-		return fmt.Errorf("state handle was not continued")
+		return errors.New("state handle was not continued")
 	}
 	return nil
 }

@@ -196,7 +196,11 @@ func TestCIMDRequiresNonRootHTTPSURL(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			err := validateCIMDConfiguration(test.clientID)
 			if (err != nil) != test.wantError {
-				t.Fatalf("validateCIMDConfiguration() error = %v, wantError %t", err, test.wantError)
+				t.Fatalf(
+					"validateCIMDConfiguration() error = %v, wantError %t",
+					err,
+					test.wantError,
+				)
 			}
 		})
 	}
